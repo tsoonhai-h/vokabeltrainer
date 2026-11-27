@@ -10,8 +10,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
-  <script type="module" crossorigin src="./index-Cm5QWv66.js"></script>
-  <link rel="stylesheet" crossorigin href="./index-Dwuc6fGq.css">
+  <script type="module" src="/src/main.js"></script>
 </head>
 <body>
 <div x-data="vokabeltrainer" x-cloak class="mx-auto flex min-h-dvh max-w-md flex-col pb-[env(safe-area-inset-bottom)]">
@@ -23,7 +22,11 @@
         <button type="button" @click="back()" aria-label="Zurück" class="flex size-11 items-center justify-center rounded-xl text-ink hover:bg-brand-soft">
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
         </button>
-        <h1 class="flex-1 truncate text-lg font-extrabold" x-text="title"></h1>
+        <div class="min-w-0 flex-1">
+          <h1 class="truncate text-lg leading-tight font-extrabold" x-text="title"></h1>
+          <p x-show="subtitle" class="truncate text-sm font-bold text-muted" x-text="subtitle"></p>
+        </div>
+        <span x-show="counter" class="pr-3 text-[15px] font-extrabold text-muted" x-text="counter"></span>
       </div>
       <template x-if="screen === 'cards' || screen === 'quiz'">
         <div class="mx-6 h-2 overflow-hidden rounded-full bg-line">
@@ -69,20 +72,24 @@
   <section x-show="screen === 'lesson'" class="flex flex-col gap-4 px-6 pt-4 pb-6">
     <div class="flex flex-col gap-3 rounded-3xl bg-brand p-5 text-white">
       <div>
-        <p class="text-[15px] font-bold text-brand-pale" x-text="`Teil ${part + 1} von ${parts.length}`"></p>
-        <p class="text-[26px] font-black" x-text="`Wörter ${partLabel(part)} von ${lesson.words.length}`"></p>
+        <p class="text-[15px] font-bold text-brand-pale" x-text="selectionTitle"></p>
+        <p class="text-[26px] leading-tight font-black" x-text="`${selectionLabel} von ${lesson.words.length}`"></p>
       </div>
-      <div class="flex justify-between rounded-2xl bg-white px-2.5 py-1.5">
+      <div class="flex flex-wrap justify-center gap-x-2 rounded-2xl bg-white px-2.5 py-1.5">
         <template x-for="w in partWords" :key="w.id">
           <span class="text-[26px] leading-snug" x-text="w.img"></span>
         </template>
       </div>
-      <p class="-mb-1 text-sm font-extrabold text-brand-pale">Teil wählen</p>
+      <div class="-mb-1 flex items-center justify-between">
+        <p class="text-sm font-extrabold text-brand-pale">Teile wählen (auch mehrere)</p>
+        <button type="button" @click="selectAll()" class="h-8 rounded-lg border-2 border-brand-pale px-2.5 text-sm font-black"
+          :class="allSelected ? 'bg-white text-brand' : 'bg-transparent text-white'">Alle</button>
+      </div>
       <div class="grid grid-cols-4 gap-1.5">
         <template x-for="(p, i) in parts" :key="i">
-          <button type="button" @click="part = i" :aria-label="`Teil ${i + 1}: Wörter ${partLabel(i)}`"
+          <button type="button" @click="toggleSelected(i)" :aria-pressed="isSelected(i)" :aria-label="`Teil ${i + 1}: Wörter ${partLabel(i)}`"
             class="flex h-[52px] flex-col items-center justify-center gap-0.5 rounded-xl border-2 border-brand-pale text-[15px] font-black"
-            :class="part === i ? 'bg-white text-brand' : 'bg-transparent text-white'">
+            :class="isSelected(i) ? 'bg-white text-brand' : 'bg-transparent text-white'">
             <span x-text="partLabel(i)"></span>
             <template x-if="hasPartMedal(i)">
               <svg width="12" height="15" viewBox="0 0 200 250" aria-hidden="true"><path d="M62 0h34L78 118H44z" fill="#1A43A8"/><path d="M104 0h34l18 118h-34z" fill="#C2560C"/><circle cx="100" cy="170" r="74" fill="#C9962E"/><circle cx="100" cy="170" r="60" fill="#F6D376"/></svg>
@@ -151,8 +158,8 @@
         <span class="text-[17px] font-bold text-muted" x-text="lesson.name"></span>
       </div>
       <div class="flex flex-1 flex-col items-center justify-center gap-3 px-1.5 text-center">
-        <template x-if="current.imgFile"><img :src="current.imgFile" alt="" class="size-[72px] object-contain"></template>
-        <template x-if="!current.imgFile"><span class="text-7xl leading-none" x-text="current.img"></span></template>
+        <template x-if="flipped && current.imgFile"><img :src="current.imgFile" alt="" class="size-[72px] object-contain"></template>
+        <template x-if="flipped && !current.imgFile"><span class="text-7xl leading-none" x-text="current.img"></span></template>
         <p class="text-[32px] font-black leading-tight" x-text="cardFront"></p>
         <template x-if="showSpell">
           <div class="w-full rounded-2xl bg-spell-soft px-3 py-2.5 text-left">
@@ -173,13 +180,16 @@
           </div>
         </template>
       </div>
-      <template x-if="!flipped">
-        <button type="button" @click="flip()" class="h-14 rounded-2xl bg-brand-soft text-[17px] font-extrabold">Umdrehen</button>
-      </template>
-      <template x-if="flipped">
+      <button type="button" @click="flip()" class="flex h-14 items-center justify-center gap-2 rounded-2xl bg-brand-soft text-[17px] font-extrabold">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 0 1 15.5-6.2L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15.5 6.2L3 16"/><path d="M3 21v-5h5"/></svg>
+        Umdrehen
+      </button>
+      <template x-if="revealed">
         <div class="grid grid-cols-2 gap-2.5">
           <button type="button" @click="answerCard(false)" class="h-14 rounded-2xl border-2 border-brand bg-white text-base font-extrabold text-brand">Wusste ich nicht</button>
-          <button type="button" @click="answerCard(true)" class="h-14 rounded-2xl bg-brand text-base font-black text-white">Wusste ich</button>
+          <button type="button" @click="answerCard(true)" :disabled="pinned(current)"
+            :title="pinned(current) ? 'Wort steht auf „Nochmal üben“' : ''"
+            class="h-14 rounded-2xl bg-brand text-base font-black text-white disabled:cursor-not-allowed disabled:bg-line disabled:text-muted">Wusste ich</button>
         </div>
       </template>
     </div>
@@ -196,9 +206,9 @@
         </button>
         <span class="text-[17px] font-bold text-muted">Was heißt …</span>
       </div>
-      <template x-if="current.imgFile"><img :src="current.imgFile" alt="" class="size-14 object-contain"></template>
-      <template x-if="!current.imgFile"><span class="text-[54px] leading-none" x-text="current.img"></span></template>
-      <p class="text-center text-3xl font-black" x-text="current.en"></p>
+      <p class="py-3 text-center text-3xl font-black" x-text="current.en"></p>
+      <template x-if="picked !== null && current.imgFile"><img :src="current.imgFile" alt="" class="size-14 object-contain"></template>
+      <template x-if="picked !== null && !current.imgFile"><span class="text-[54px] leading-none" x-text="current.img"></span></template>
     </div>
 
     <div class="flex flex-col gap-2.5">
