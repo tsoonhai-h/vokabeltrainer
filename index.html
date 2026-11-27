@@ -1,0 +1,341 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#F2F5FA">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Vokabeln">
+  <title>Vokabeltrainer</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+  <script type="module" crossorigin src="./index-Cm5QWv66.js"></script>
+  <link rel="stylesheet" crossorigin href="./index-Dwuc6fGq.css">
+</head>
+<body>
+<div x-data="vokabeltrainer" x-cloak class="mx-auto flex min-h-dvh max-w-md flex-col pb-[env(safe-area-inset-bottom)]">
+
+  <!-- ===== Kopfzeile (überall außer Start) ===== -->
+  <template x-if="screen !== 'start'">
+    <div class="sticky top-0 z-10 bg-ground pt-[env(safe-area-inset-top)]">
+      <div class="flex items-center gap-2 px-2 pt-4 pb-2">
+        <button type="button" @click="back()" aria-label="Zurück" class="flex size-11 items-center justify-center rounded-xl text-ink hover:bg-brand-soft">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
+        </button>
+        <h1 class="flex-1 truncate text-lg font-extrabold" x-text="title"></h1>
+      </div>
+      <template x-if="screen === 'cards' || screen === 'quiz'">
+        <div class="mx-6 h-2 overflow-hidden rounded-full bg-line">
+          <div class="h-2 rounded-full bg-brand transition-all" :style="{ width: progressPercent }"></div>
+        </div>
+      </template>
+    </div>
+  </template>
+
+  <!-- ===== Start: alle Lektionen ===== -->
+  <section x-show="screen === 'start'" class="flex flex-col gap-4 px-6 pt-[calc(env(safe-area-inset-top)+28px)] pb-6">
+    <h1 class="text-3xl font-black">Hallo!</h1>
+    <p class="text-[15px] font-extrabold text-muted">Meine Lektionen</p>
+    <p x-show="loading" class="text-muted">Lade Lektionen …</p>
+    <p x-show="error" x-text="error" class="rounded-2xl bg-warm-soft p-4 font-bold text-warm-dark"></p>
+    <template x-for="l in lessons" :key="l.id">
+      <button type="button" @click="openLesson(l)" class="flex items-center gap-3 rounded-2xl bg-white p-4 text-left shadow-sm">
+        <span class="w-10 text-center text-3xl" x-text="l.emoji"></span>
+        <span class="flex min-w-0 flex-1 flex-col gap-1">
+          <span class="flex items-center gap-1.5 text-lg font-black">
+            <span class="truncate" x-text="l.name"></span>
+            <template x-if="progressOf(l).medal">
+              <svg width="18" height="22" viewBox="0 0 200 250" role="img" aria-label="Orden"><path d="M62 0h34L78 118H44z" fill="#2459D6"/><path d="M104 0h34l18 118h-34z" fill="#C2560C"/><circle cx="100" cy="170" r="74" fill="#C9962E"/><circle cx="100" cy="170" r="60" fill="#F6D376"/></svg>
+            </template>
+          </span>
+          <span class="flex flex-wrap items-center gap-1.5 text-sm font-bold text-muted">
+            <span x-text="`${l.words.length} Wörter`"></span>
+            <template x-if="pinCountOf(l) > 0">
+              <span class="flex items-center gap-1 text-warm-dark">·
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="#C2560C" stroke="#C2560C" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M12 2.5l2.9 6.1 6.6.8-4.9 4.6 1.3 6.6L12 17.3l-5.9 3.3 1.3-6.6-4.9-4.6 6.6-.8z"/></svg>
+                <span x-text="`${pinCountOf(l)} nochmal üben`"></span>
+              </span>
+            </template>
+          </span>
+        </span>
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#4A5568" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
+      </button>
+    </template>
+  </section>
+
+  <!-- ===== Lektion ===== -->
+  <template x-if="lesson">
+  <section x-show="screen === 'lesson'" class="flex flex-col gap-4 px-6 pt-4 pb-6">
+    <div class="flex flex-col gap-3 rounded-3xl bg-brand p-5 text-white">
+      <div>
+        <p class="text-[15px] font-bold text-brand-pale" x-text="`Teil ${part + 1} von ${parts.length}`"></p>
+        <p class="text-[26px] font-black" x-text="`Wörter ${partLabel(part)} von ${lesson.words.length}`"></p>
+      </div>
+      <div class="flex justify-between rounded-2xl bg-white px-2.5 py-1.5">
+        <template x-for="w in partWords" :key="w.id">
+          <span class="text-[26px] leading-snug" x-text="w.img"></span>
+        </template>
+      </div>
+      <p class="-mb-1 text-sm font-extrabold text-brand-pale">Teil wählen</p>
+      <div class="grid grid-cols-4 gap-1.5">
+        <template x-for="(p, i) in parts" :key="i">
+          <button type="button" @click="part = i" :aria-label="`Teil ${i + 1}: Wörter ${partLabel(i)}`"
+            class="flex h-[52px] flex-col items-center justify-center gap-0.5 rounded-xl border-2 border-brand-pale text-[15px] font-black"
+            :class="part === i ? 'bg-white text-brand' : 'bg-transparent text-white'">
+            <span x-text="partLabel(i)"></span>
+            <template x-if="hasPartMedal(i)">
+              <svg width="12" height="15" viewBox="0 0 200 250" aria-hidden="true"><path d="M62 0h34L78 118H44z" fill="#1A43A8"/><path d="M104 0h34l18 118h-34z" fill="#C2560C"/><circle cx="100" cy="170" r="74" fill="#C9962E"/><circle cx="100" cy="170" r="60" fill="#F6D376"/></svg>
+            </template>
+          </button>
+        </template>
+      </div>
+      <div class="flex items-center justify-center gap-1.5 text-sm font-extrabold text-brand-pale">
+        <template x-for="(p, i) in parts" :key="'m' + i">
+          <svg width="16" height="20" viewBox="0 0 200 250" aria-hidden="true" :style="{ opacity: hasPartMedal(i) ? 1 : 0.3 }"><path d="M62 0h34L78 118H44z" fill="#DCE6FF"/><path d="M104 0h34l18 118h-34z" fill="#F3C9A4"/><circle cx="100" cy="170" r="74" fill="#C9962E"/><circle cx="100" cy="170" r="60" fill="#F6D376"/></svg>
+        </template>
+        <span x-text="`${progress.partMedals.length} von ${parts.length} kleinen Orden`"></span>
+      </div>
+      <button type="button" @click="startCards()" class="h-14 rounded-2xl bg-white text-lg font-black text-brand">Los geht's</button>
+    </div>
+
+    <div class="grid grid-cols-2 gap-2.5">
+      <button type="button" @click="startCards()" class="flex min-h-22 flex-col items-center gap-1.5 rounded-2xl border-2 border-line bg-white p-2.5">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#2459D6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="6" width="14" height="14" rx="2"/><path d="M7 3h12a2 2 0 0 1 2 2v12"/></svg>
+        <span class="text-sm font-extrabold">Karteikarten</span>
+      </button>
+      <button type="button" @click="startQuiz()" class="flex min-h-22 flex-col items-center gap-1.5 rounded-2xl border-2 border-line bg-white p-2.5">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#2459D6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6V14M12 17.5v.01"/></svg>
+        <span class="text-sm font-extrabold">Quiz</span>
+      </button>
+    </div>
+
+    <button type="button" @click="go('pins')" class="flex flex-col gap-2.5 rounded-2xl bg-white p-4 text-left">
+      <span class="flex w-full items-center justify-between">
+        <span class="flex items-center gap-1.5 text-[17px] font-extrabold">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="#C2560C" stroke="#C2560C" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M12 2.5l2.9 6.1 6.6.8-4.9 4.6 1.3 6.6L12 17.3l-5.9 3.3 1.3-6.6-4.9-4.6 6.6-.8z"/></svg>
+          Nochmal üben
+        </span>
+        <span class="text-[15px] font-extrabold text-muted" x-text="`${progress.pins.length} von ${lesson.words.length}`"></span>
+      </span>
+      <span class="block h-2 w-full overflow-hidden rounded-full bg-line">
+        <span class="block h-2 bg-warm" :style="{ width: `${Math.round(progress.pins.length / lesson.words.length * 100)}%` }"></span>
+      </span>
+    </button>
+
+    <button type="button" @click="go('list')" class="h-13 rounded-2xl border-2 border-brand bg-white text-base font-extrabold text-brand">Alle Wörter</button>
+  </section>
+  </template>
+
+  <!-- ===== Karteikarten ===== -->
+  <template x-if="screen === 'cards' && current">
+  <section class="flex flex-1 flex-col gap-3.5 px-6 pt-4 pb-6">
+    <div class="flex gap-2">
+      <div class="grid flex-1 grid-cols-2 gap-1 rounded-2xl bg-line p-1">
+        <button type="button" @click="setDir('en')" class="h-11 rounded-xl text-sm font-extrabold" :class="dir === 'en' ? 'bg-white' : 'bg-transparent'">EN → DE</button>
+        <button type="button" @click="setDir('de')" class="h-11 rounded-xl text-sm font-extrabold" :class="dir === 'de' ? 'bg-white' : 'bg-transparent'">DE → EN</button>
+      </div>
+      <button type="button" @click="togglePin(current)" :aria-pressed="pinned(current)" aria-label="Auf die Liste Nochmal üben setzen"
+        class="flex h-[52px] items-center gap-1.5 rounded-2xl border-2 border-warm px-3 text-sm font-black text-warm-dark"
+        :class="pinned(current) ? 'bg-warm-soft' : 'bg-white'">
+        <svg width="20" height="20" viewBox="0 0 24 24" :fill="pinned(current) ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M12 2.5l2.9 6.1 6.6.8-4.9 4.6 1.3 6.6L12 17.3l-5.9 3.3 1.3-6.6-4.9-4.6 6.6-.8z"/></svg>
+        Nochmal üben
+      </button>
+    </div>
+
+    <div class="flex flex-1 flex-col gap-2.5 rounded-[28px] bg-white p-[18px] shadow-[0_6px_20px_rgba(23,32,51,0.08)]">
+      <div class="relative flex h-10 items-center justify-center">
+        <button type="button" @click="speak(current)" aria-label="Englisches Wort anhören" class="absolute -top-1 left-0 flex size-12 items-center justify-center rounded-full bg-brand text-white">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M19 5a10 10 0 0 1 0 14"/></svg>
+        </button>
+        <span class="text-[17px] font-bold text-muted" x-text="lesson.name"></span>
+      </div>
+      <div class="flex flex-1 flex-col items-center justify-center gap-3 px-1.5 text-center">
+        <template x-if="current.imgFile"><img :src="current.imgFile" alt="" class="size-[72px] object-contain"></template>
+        <template x-if="!current.imgFile"><span class="text-7xl leading-none" x-text="current.img"></span></template>
+        <p class="text-[32px] font-black leading-tight" x-text="cardFront"></p>
+        <template x-if="showSpell">
+          <div class="w-full rounded-2xl bg-spell-soft px-3 py-2.5 text-left">
+            <p class="text-xs font-black tracking-wider text-spell-dark">SCHREIBWEISE</p>
+            <p class="text-[15px] font-bold leading-snug" x-text="current.spell"></p>
+          </div>
+        </template>
+        <template x-if="flipped && current.move">
+          <div class="w-full rounded-2xl bg-warm-soft px-3 py-2.5 text-left">
+            <p class="text-xs font-black tracking-wider text-warm-dark">BEWEGUNG</p>
+            <p class="text-[15px] font-bold leading-snug" x-text="current.move"></p>
+          </div>
+        </template>
+        <template x-if="flipped && current.esel">
+          <div class="w-full rounded-2xl bg-brand-soft px-3 py-2.5 text-left">
+            <p class="text-xs font-black tracking-wider text-brand-dark">ESELSBRÜCKE</p>
+            <p class="text-[15px] font-bold leading-snug" x-text="current.esel"></p>
+          </div>
+        </template>
+      </div>
+      <template x-if="!flipped">
+        <button type="button" @click="flip()" class="h-14 rounded-2xl bg-brand-soft text-[17px] font-extrabold">Umdrehen</button>
+      </template>
+      <template x-if="flipped">
+        <div class="grid grid-cols-2 gap-2.5">
+          <button type="button" @click="answerCard(false)" class="h-14 rounded-2xl border-2 border-brand bg-white text-base font-extrabold text-brand">Wusste ich nicht</button>
+          <button type="button" @click="answerCard(true)" class="h-14 rounded-2xl bg-brand text-base font-black text-white">Wusste ich</button>
+        </div>
+      </template>
+    </div>
+  </section>
+  </template>
+
+  <!-- ===== Quiz ===== -->
+  <template x-if="screen === 'quiz' && current">
+  <section class="flex flex-col gap-3 px-6 pt-4 pb-6">
+    <div class="flex flex-col items-center gap-1.5 rounded-[28px] bg-white p-5 shadow-[0_6px_20px_rgba(23,32,51,0.06)]">
+      <div class="relative flex h-10 w-full items-center justify-center">
+        <button type="button" @click="speak(current)" aria-label="Englisches Wort anhören" class="absolute -top-1 left-0 flex size-12 items-center justify-center rounded-full bg-brand text-white">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M19 5a10 10 0 0 1 0 14"/></svg>
+        </button>
+        <span class="text-[17px] font-bold text-muted">Was heißt …</span>
+      </div>
+      <template x-if="current.imgFile"><img :src="current.imgFile" alt="" class="size-14 object-contain"></template>
+      <template x-if="!current.imgFile"><span class="text-[54px] leading-none" x-text="current.img"></span></template>
+      <p class="text-center text-3xl font-black" x-text="current.en"></p>
+    </div>
+
+    <div class="flex flex-col gap-2.5">
+      <template x-for="o in options" :key="o">
+        <button type="button" @click="pick(o)"
+          class="flex min-h-14 items-center justify-between gap-2 rounded-2xl border-[3px] px-4 py-2 text-left text-[17px] font-extrabold"
+          :class="{
+            'border-line bg-white': optionState(o) === 'idle',
+            'border-brand bg-brand-soft': optionState(o) === 'right',
+            'border-warm bg-warm-soft': optionState(o) === 'wrong'
+          }">
+          <span x-text="o"></span>
+          <span class="text-sm font-black" x-show="optionState(o) !== 'idle'"
+            :class="optionState(o) === 'right' ? 'text-brand-dark' : 'text-warm-dark'"
+            x-text="optionState(o) === 'right' ? 'Richtig' : 'Falsch'"></span>
+        </button>
+      </template>
+    </div>
+
+    <template x-if="picked !== null">
+      <div class="flex flex-col gap-3">
+        <p class="text-center text-base font-extrabold" :class="pickedRight ? 'text-brand-dark' : 'text-warm-dark'"
+          x-text="pickedRight ? 'Super, richtig!' : `Richtig ist: ${current.de}`"></p>
+        <template x-if="!pickedRight && current.spell">
+          <div class="rounded-2xl bg-spell-soft px-3 py-2.5">
+            <p class="text-xs font-black tracking-wider text-spell-dark">SCHREIBWEISE</p>
+            <p class="text-[15px] font-bold" x-text="current.spell"></p>
+          </div>
+        </template>
+        <template x-if="!pickedRight && current.esel">
+          <div class="rounded-2xl bg-brand-soft px-3 py-2.5">
+            <p class="text-xs font-black tracking-wider text-brand-dark">ESELSBRÜCKE</p>
+            <p class="text-[15px] font-bold" x-text="current.esel"></p>
+          </div>
+        </template>
+        <div class="grid grid-cols-2 gap-2.5">
+          <button type="button" @click="togglePin(current)" :aria-pressed="pinned(current)" aria-label="Auf die Liste Nochmal üben setzen"
+            class="flex h-14 items-center justify-center gap-1.5 rounded-2xl border-2 border-warm text-base font-black text-warm-dark"
+            :class="pinned(current) ? 'bg-warm-soft' : 'bg-white'">
+            <svg width="20" height="20" viewBox="0 0 24 24" :fill="pinned(current) ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M12 2.5l2.9 6.1 6.6.8-4.9 4.6 1.3 6.6L12 17.3l-5.9 3.3 1.3-6.6-4.9-4.6 6.6-.8z"/></svg>
+            Nochmal üben
+          </button>
+          <button type="button" @click="nextQuestion()" class="h-14 rounded-2xl bg-brand text-lg font-black text-white">Weiter</button>
+        </div>
+      </div>
+    </template>
+  </section>
+  </template>
+
+  <!-- ===== Fertig ===== -->
+  <template x-if="screen === 'done' && lesson">
+  <section class="flex flex-1 flex-col items-center gap-4 px-6 pt-12 pb-6 text-center">
+    <div class="flex size-28 items-center justify-center rounded-full bg-brand text-white">
+      <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>
+    </div>
+    <h2 class="text-[32px] font-black">Geschafft!</h2>
+    <template x-if="newParts.length">
+      <div class="flex w-full items-center gap-3.5 rounded-3xl border-2 border-line bg-white p-4 text-left">
+        <svg width="44" height="55" viewBox="0 0 200 250" aria-hidden="true"><path d="M62 0h34L78 118H44z" fill="#2459D6"/><path d="M104 0h34l18 118h-34z" fill="#C2560C"/><circle cx="100" cy="170" r="74" fill="#C9962E"/><circle cx="100" cy="170" r="60" fill="#F6D376"/></svg>
+        <div>
+          <p class="text-lg font-black" x-text="`Kleiner Orden für ${newPartLabel}!`"></p>
+          <p class="text-[15px] font-bold text-muted" x-text="`Sammle alle ${parts.length} für den großen Orden.`"></p>
+        </div>
+      </div>
+    </template>
+    <p class="text-xl font-extrabold" x-text="`${score} von ${total} richtig`"></p>
+    <div class="flex-1"></div>
+    <button type="button" @click="go('pins')" class="h-14 w-full rounded-2xl border-2 border-warm bg-warm-soft text-[17px] font-extrabold text-warm-dark" x-text="`Nochmal üben (${progress.pins.length})`"></button>
+    <button type="button" @click="go('lesson')" class="h-14 w-full rounded-2xl bg-brand text-lg font-black text-white">Zurück zur Lektion</button>
+  </section>
+  </template>
+
+  <!-- ===== Großer Orden ===== -->
+  <template x-if="screen === 'medal' && lesson && reward">
+  <section class="flex flex-1 flex-col items-center gap-3.5 px-6 pt-6 pb-6 text-center">
+    <svg width="180" height="230" viewBox="0 0 200 250" role="img" :aria-label="`Orden für ${lesson.name}`">
+      <path d="M62 0h34L78 118H44z" fill="#2459D6"/><path d="M104 0h34l18 118h-34z" fill="#C2560C"/><path d="M86 0h28l-6 40h-16z" fill="#1A43A8"/>
+      <circle cx="100" cy="170" r="74" fill="#C9962E"/><circle cx="100" cy="170" r="66" fill="#E9B949"/><circle cx="100" cy="170" r="52" fill="#F6D376" stroke="#C9962E" stroke-width="3"/>
+      <path transform="translate(100 168) scale(3.3) translate(-12 -12)" d="M12 2.5l2.9 6.1 6.6.8-4.9 4.6 1.3 6.6L12 17.3l-5.9 3.3 1.3-6.6-4.9-4.6 6.6-.8z" fill="#C9962E"/>
+    </svg>
+    <h2 class="text-3xl font-black leading-tight" x-text="`${lesson.name} gemeistert!`"></h2>
+    <p class="text-[17px] font-extrabold text-muted" x-text="`Alle ${lesson.words.length} Wörter richtig`"></p>
+    <div class="flex w-full flex-col items-center gap-2 rounded-3xl border-2 border-line bg-white p-4.5">
+      <span class="text-[40px] leading-none" x-text="reward.bild"></span>
+      <p class="text-xs font-black tracking-wider text-warm-dark">DEINE BELOHNUNG</p>
+      <p class="text-lg font-extrabold leading-snug" x-text="reward.text"></p>
+      <p class="text-[15px] font-bold text-muted">Zeig Mama deinen Orden!</p>
+    </div>
+    <div class="flex-1"></div>
+    <button type="button" @click="go('lesson')" class="h-14 w-full rounded-2xl bg-brand text-lg font-black text-white">Zurück zur Lektion</button>
+  </section>
+  </template>
+
+  <!-- ===== Alle Wörter / Nochmal üben ===== -->
+  <template x-if="(screen === 'list' || screen === 'pins') && lesson">
+  <section class="flex flex-col gap-2.5 px-6 pt-3.5 pb-6">
+    <template x-if="screen === 'pins' && pinnedWords.length === 0">
+      <div class="flex flex-col items-center gap-2.5 rounded-3xl bg-white p-6 text-center">
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#C2560C" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M12 2.5l2.9 6.1 6.6.8-4.9 4.6 1.3 6.6L12 17.3l-5.9 3.3 1.3-6.6-4.9-4.6 6.6-.8z"/></svg>
+        <p class="text-lg font-black">Die Liste ist leer</p>
+        <p class="text-[15px] leading-relaxed text-muted">Klappt ein Wort noch nicht? Tippe bei der Karteikarte, im Quiz oder in „Alle Wörter“ auf den Stern. Dann landet es hier.</p>
+      </div>
+    </template>
+    <template x-if="screen === 'pins' && pinnedWords.length > 0">
+      <button type="button" @click="startPinCards()" class="h-14 rounded-2xl bg-warm text-lg font-black text-white"
+        x-text="pinnedWords.length === 1 ? '1 Wort jetzt üben' : `${pinnedWords.length} Wörter jetzt üben`"></button>
+    </template>
+    <template x-for="(w, i) in (screen === 'pins' ? pinnedWords : lesson.words)" :key="w.id">
+      <div class="flex flex-col gap-2.5">
+        <template x-if="screen === 'list' && i % 8 === 0">
+          <p class="pt-1.5 text-sm font-black tracking-wider text-muted" x-text="`TEIL ${i / 8 + 1} · WÖRTER ${partLabel(i / 8)}`"></p>
+        </template>
+        <div class="flex gap-2.5 rounded-2xl border-2 bg-white py-3 pr-2.5 pl-3.5" :class="pinned(w) ? 'border-warm-line' : 'border-white'">
+          <span class="w-10 text-center text-[34px] leading-tight" x-text="w.img"></span>
+          <div class="flex min-w-0 flex-1 flex-col gap-1.5">
+            <div><p class="text-[17px] font-black" x-text="w.en"></p><p class="text-sm text-muted" x-text="w.de"></p></div>
+            <template x-if="w.spell">
+              <div class="rounded-xl bg-spell-soft px-3 py-2"><p class="text-[11px] font-black tracking-wider text-spell-dark">SCHREIBWEISE</p><p class="text-sm font-bold" x-text="w.spell"></p></div>
+            </template>
+            <template x-if="w.move">
+              <div class="rounded-xl bg-warm-soft px-3 py-2"><p class="text-[11px] font-black tracking-wider text-warm-dark">BEWEGUNG</p><p class="text-sm font-bold" x-text="w.move"></p></div>
+            </template>
+            <template x-if="w.esel">
+              <div class="rounded-xl bg-brand-soft px-3 py-2"><p class="text-[11px] font-black tracking-wider text-brand-dark">ESELSBRÜCKE</p><p class="text-sm font-bold" x-text="w.esel"></p></div>
+            </template>
+          </div>
+          <button type="button" @click="togglePin(w)" :aria-pressed="pinned(w)" :aria-label="pinned(w) ? `${w.en} von der Liste Nochmal üben nehmen` : `${w.en} nochmal üben`"
+            class="flex size-11 shrink-0 items-center justify-center rounded-xl"
+            :class="pinned(w) ? 'bg-warm-soft text-warm' : 'bg-ground text-muted'">
+            <svg width="22" height="22" viewBox="0 0 24 24" :fill="pinned(w) ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M12 2.5l2.9 6.1 6.6.8-4.9 4.6 1.3 6.6L12 17.3l-5.9 3.3 1.3-6.6-4.9-4.6 6.6-.8z"/></svg>
+          </button>
+        </div>
+      </div>
+    </template>
+  </section>
+  </template>
+
+</div>
+</body>
+</html>
