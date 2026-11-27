@@ -1,6 +1,10 @@
 {
   "lektionen": [
     {
+      "id": "seite-248",
+      "datei": "seite-248.json"
+    },
+    {
       "id": "lektion-1",
       "datei": "lektion-1.json"
     }
